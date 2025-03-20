@@ -15,7 +15,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_loader, test_loader = get_cifar10_dataloader()
     torch.manual_seed(42)
-    save_path = "models/best_model.pth"  # 保存到项目根目录下的 models 文件夹
+    save_path = "models/teacher/best_model.pth"  # 保存到项目根目录下的 models 文件夹
     nn_deep = DeepNN(num_classes=10).to(device)
     nn_deep.load_state_dict(torch.load(save_path))
     nn_deep.eval()
@@ -31,20 +31,18 @@ def main():
     torch.manual_seed(42)
     nn_light = LightNN(num_classes=10).to(device)
 
-
-    train(nn_light, train_loader, test_loader, epochs=10, learning_rate=0.001, device=device)
-    test_accuracy_light_ce = test(nn_light, test_loader, device)
-
-    print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
-    print(f"Student accuracy: {test_accuracy_light_ce:.2f}%")
+    # 在蒸馏之前训练学生模型:
+    # test_accuracy_light_ce = train(nn_light, train_loader, test_loader, epochs=20, learning_rate=0.001, device=device)
+    # print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
+    # print(f"Student best accuracy: {test_accuracy_light_ce:.2f}%")
 
     # 默认蒸馏温度T为4
-    train_knowledge_distillation(teacher=nn_deep, student=nn_light, train_loader=train_loader, test_loader=test_loader, epochs=10,
+    best_acc = train_knowledge_distillation(teacher=nn_deep, student=nn_light, train_loader=train_loader, test_loader=test_loader, epochs=20,
                                  learning_rate=0.001, T=4, device=device)
-    test_accuracy_light_ce_and_kd = test(nn_light, test_loader, device)
+    test_accuracy_light_ce_and_kd = best_acc
     # Compare the student test accuracy with and without the teacher, after distillation
     print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
-    print(f"Student accuracy without teacher: {test_accuracy_light_ce:.2f}%")
+    # print(f"Student accuracy without teacher: {test_accuracy_light_ce:.2f}%")
     print(f"Student accuracy with CE + KD: {test_accuracy_light_ce_and_kd:.2f}%")
 
 # 按装订区域中的绿色按钮以运行脚本。
