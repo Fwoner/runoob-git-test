@@ -9,13 +9,20 @@ import torchvision.datasets as datasets
 from network.testNetwork import DeepNN, LightNN
 from train_distill.loops import train, test, train_knowledge_distillation
 from dataset.cifar10 import get_cifar10_dataloader
+# from dataset.tiny_imagenet import get_tiny_imagenet_dataloader
 
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # train_loader, test_loader = get_tiny_imagenet_dataloader()   # 加载tiny imagenet 数据集
     train_loader, test_loader = get_cifar10_dataloader()
     torch.manual_seed(42)
     save_path = "models/DeepNN_2025-03-24_11-22-23/best_model.pth"  # 保存到项目根目录下的 models 文件夹
+
+    # imagenet修改分类数量
+    # nn_deep = DeepNN(num_classes=200).to(device)
+    # nn_light = LightNN(num_classes=200).to(device)
     nn_deep = DeepNN(num_classes=10).to(device)
     nn_deep.load_state_dict(torch.load(save_path))
     nn_deep.eval()
