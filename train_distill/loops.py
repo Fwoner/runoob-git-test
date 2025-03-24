@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 import math
 import tensorboard_logger as tb_logger
-from tensorboard_logger import log_value
 import os
 
 def train(model, train_loader, test_loader, epochs, learning_rate, device):
@@ -29,6 +28,8 @@ def train(model, train_loader, test_loader, epochs, learning_rate, device):
     model_save_path = os.path.join(model_subdir, 'best_model.pth')
     model.train()
     best_acc = 0
+    patience = 5
+    epochs_no_improve = 0
 
     for epoch in range(epochs):
         running_loss = 0.0
@@ -50,10 +51,17 @@ def train(model, train_loader, test_loader, epochs, learning_rate, device):
         test_acc = test(model, test_loader, device)
         if test_acc > best_acc:
             best_acc = test_acc
-            # torch.save(model.state_dict(), 'F:/PythonProject/DistillationExercise/models/best_model.pth')
             torch.save(model.state_dict(), model_save_path)
             print("Best model saved")
             logger.log_value('best_acc', best_acc, epoch+1)
+            epochs_no_improve = 0  # Reset epochs_no_improve if there is an improvement
+        else:
+            epochs_no_improve += 1  # Increment epochs_no_improve if no improvement
+
+        if epochs_no_improve >= patience:
+            print(f"Early stopping at epoch {epoch+1}")
+            break
+
         logger.log_value('train_acc', test_acc, epoch+1)
         logger.log_value('train_loss', running_loss / len(train_loader), epoch+1)
         print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}")
@@ -96,10 +104,11 @@ def train_knowledge_distillation(teacher, student, train_loader, test_loader, ep
     os.makedirs(log_subdir, exist_ok=True)
     os.makedirs(student_subdir, exist_ok=True)
     student_save_path = os.path.join(student_subdir, 'best_model.pth')
-    best_acc = 0
-    teacher.eval()  # Teacher set to evaluation mode
-    student.train() # Student to train mode
     logger = tb_logger.Logger(logdir=log_subdir, flush_secs=2)
+    best_acc = 0
+    patience = 5
+    epochs_no_improve = 0
+
     for epoch in range(epochs):
         running_loss = 0.0
         for inputs, labels in train_loader:
@@ -141,6 +150,14 @@ def train_knowledge_distillation(teacher, student, train_loader, test_loader, ep
             torch.save(student.state_dict(), student_save_path)
             print("Best model saved")
             logger.log_value('best_acc', best_acc, epoch+1)
+            epochs_no_improve = 0  # Reset epochs_no_improve if there is an improvement
+        else:
+            epochs_no_improve += 1  # Increment epochs_no_improve if no improvement
+
+        if epochs_no_improve >= patience:
+            print(f"Early stopping at epoch {epoch+1}")
+            break
+
         logger.log_value('student_loss', running_loss / len(train_loader), epoch+1)
         logger.log_value('student_acc', test_acc, epoch+1)
         print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}")
