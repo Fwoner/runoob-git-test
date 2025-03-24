@@ -11,13 +11,16 @@ import os
 def train(model, train_loader, test_loader, epochs, learning_rate, device):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    #
     # 动态生成子文件夹路径
     log_base_dir = 'F:/PythonProject/DistillationExercise/logs'
     model_base_dir = 'F:/PythonProject/DistillationExercise/models'
+    # 获取模型名称
+    model_name = model.__class__.__name__
+    # 动态生成子文件夹路径
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # 格式化日期和时间
-    log_subdir = os.path.join(log_base_dir, current_time)  # 子文件夹路径
-    model_subdir = os.path.join(model_base_dir, current_time)  # 模型子文件夹路径
+    log_subdir = os.path.join(log_base_dir, f"{model_name}_{current_time}")  # 子文件夹路径
+    model_subdir = os.path.join(model_base_dir, f"{model_name}_{current_time}")  # 模型子文件夹路径
+
     os.makedirs(log_subdir, exist_ok=True)  # 创建子文件夹
     os.makedirs(model_subdir, exist_ok=True)  # 创建模型子文件夹
 
@@ -55,7 +58,7 @@ def train(model, train_loader, test_loader, epochs, learning_rate, device):
         logger.log_value('train_loss', running_loss / len(train_loader), epoch+1)
         print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}")
     print("Best accuracy:", best_acc)
-    return best_acc
+    return best_acc, model_save_path
 
 def test(model, test_loader, device):
     model.to(device)
@@ -82,13 +85,14 @@ def test(model, test_loader, device):
 
 
 def train_knowledge_distillation(teacher, student, train_loader, test_loader, epochs, learning_rate, T,  device):
+    student_name = student.__class__.__name__
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(student.parameters(), lr=learning_rate)
     log_base_dir = 'F:/PythonProject/DistillationExercise/logs/distill'
     student_base_dir = 'F:/PythonProject/DistillationExercise/save/student_model'
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_subdir = os.path.join(log_base_dir, current_time)
-    student_subdir = os.path.join(student_base_dir, current_time)
+    log_subdir = os.path.join(log_base_dir, f"{student_name}_{current_time}")
+    student_subdir = os.path.join(student_base_dir, f"{student_name}_{current_time}")
     os.makedirs(log_subdir, exist_ok=True)
     os.makedirs(student_subdir, exist_ok=True)
     student_save_path = os.path.join(student_subdir, 'best_model.pth')
