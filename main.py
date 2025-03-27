@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
 from network.testNetwork import DeepNN, LightNN
-from train_distill.loops import train, test, train_knowledge_distillation
+from train_distill.loops import train, test, train_knowledge_distillation, dynamic_knowledge_distillation
 from dataset.cifar10 import get_cifar10_dataloader
 # from dataset.tiny_imagenet import get_tiny_imagenet_dataloader
 
@@ -43,9 +43,11 @@ def main():
     # print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
     # print(f"Student best accuracy: {test_accuracy_light_ce:.2f}%")
 
-    # 默认蒸馏温度T为4
+    # 默认蒸馏温度T为4, 固定参数或者cos蒸馏
     best_acc = train_knowledge_distillation(teacher=nn_deep, student=nn_light, train_loader=train_loader, test_loader=test_loader, epochs=20,
                                  learning_rate=0.001, T=4, device=device)
+    # 两个可学习参数
+
     test_accuracy_light_ce_and_kd = best_acc
     # Compare the student test accuracy with and without the teacher, after distillation
     print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")

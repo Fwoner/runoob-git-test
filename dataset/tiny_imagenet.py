@@ -10,7 +10,6 @@ class TinyImageNet(Dataset):
         self.transform = transform
         self.train = train
         
-        # 设置训练集或验证集的路径
         if self.train:
             self.data_dir = os.path.join(root, 'train')
         else:
@@ -20,9 +19,7 @@ class TinyImageNet(Dataset):
         self.labels = []
         self.class_to_idx = {}
         
-        # 获取所有类别
         if self.train:
-            # 训练集目录结构：train/n01443537/images/n01443537_0.JPEG
             for idx, class_dir in enumerate(sorted(glob.glob(os.path.join(self.data_dir, '*')))):
                 class_name = os.path.basename(class_dir)
                 self.class_to_idx[class_name] = idx
@@ -30,7 +27,6 @@ class TinyImageNet(Dataset):
                 self.image_paths.extend(image_paths)
                 self.labels.extend([idx] * len(image_paths))
         else:
-            # 验证集目录结构：val/images/val_0.JPEG
             with open(os.path.join(root, 'val', 'val_annotations.txt'), 'r') as f:
                 for line in f:
                     image_name, class_name, _, _, _, _ = line.strip().split('\t')
@@ -53,7 +49,7 @@ class TinyImageNet(Dataset):
         return image, label
 
 def get_tiny_imagenet_dataloader(batch_size=128, num_workers=8):
-    # 数据预处理
+    # 锟斤拷锟斤拷预锟斤拷锟斤拷
     transforms_train = transforms.Compose([
         transforms.RandomResizedCrop(64),
         transforms.RandomHorizontalFlip(),
@@ -69,7 +65,7 @@ def get_tiny_imagenet_dataloader(batch_size=128, num_workers=8):
                            std=[0.229, 0.224, 0.225])
     ])
 
-    # 加载数据集
+    # 锟斤拷锟斤拷锟斤拷锟捷硷拷
     train_dataset = TinyImageNet(root='./data/tiny-imagenet-200', 
                                 train=True, 
                                 transform=transforms_train)
@@ -77,7 +73,6 @@ def get_tiny_imagenet_dataloader(batch_size=128, num_workers=8):
                                train=False, 
                                transform=transforms_val)
 
-    # 创建数据加载器
     train_loader = DataLoader(train_dataset, 
                             batch_size=batch_size,
                             shuffle=True, 
