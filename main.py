@@ -44,10 +44,13 @@ def main():
     # print(f"Student best accuracy: {test_accuracy_light_ce:.2f}%")
 
     # 默认蒸馏温度T为4, 固定参数或者cos蒸馏
-    best_acc = train_knowledge_distillation(teacher=nn_deep, student=nn_light, train_loader=train_loader, test_loader=test_loader, epochs=20,
-                                 learning_rate=0.001, T=4, device=device)
+    # best_acc = train_knowledge_distillation(teacher=nn_deep, student=nn_light, train_loader=train_loader, test_loader=test_loader, epochs=20,
+    #                              learning_rate=0.001, T=4, device=device)
     # 两个可学习参数
-
+        # 使用动态权重蒸馏
+    best_acc = dynamic_knowledge_distillation(teacher=nn_deep, student=nn_light, train_loader=train_loader, 
+                                            test_loader=test_loader, epochs=20,
+                                            learning_rate=0.001, T=4, device=device)
     test_accuracy_light_ce_and_kd = best_acc
     # Compare the student test accuracy with and without the teacher, after distillation
     print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")

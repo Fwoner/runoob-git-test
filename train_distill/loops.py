@@ -108,6 +108,8 @@ def train_knowledge_distillation(teacher, student, train_loader, test_loader, ep
     best_acc = 0
     patience = 5
     epochs_no_improve = 0
+    teacher.eval()
+    student.train()
 
     for epoch in range(epochs):
         running_loss = 0.0
@@ -163,6 +165,128 @@ def train_knowledge_distillation(teacher, student, train_loader, test_loader, ep
         print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}")
     return best_acc
 
+
+def dynamic_knowledge_distillation(teacher, student, train_loader, test_loader, epochs, learning_rate, T, device):
+    """
+    使用可学习权重的知识蒸馏方法
+    参数说明：
+    - teacher: 教师模型
+    - student: 学生模型
+    - train_loader: 训练数据加载器
+    - test_loader: 测试数据加载器
+    - epochs: 训练轮数
+    - learning_rate: 学习率
+    - T: 温度参数
+    - device: 计算设备
+    """
+    student_name = student.__class__.__name__
+    ce_loss = nn.CrossEntropyLoss()
+    
+    # 定义可学习的权重参数
+    # 使用Parameter将权重定义为可学习参数，并初始化为0.9和0.1
+    soft_target_weight = nn.Parameter(torch.tensor(0.9, device=device))
+    ce_weight = nn.Parameter(torch.tensor(0.1, device=device))
+    
+    # 将学生模型参数和权重参数一起优化
+    optimizer = optim.Adam([
+        {'params': student.parameters()},
+        {'params': [soft_target_weight, ce_weight], 'lr': learning_rate * 0.1}  # 权重参数使用较小的学习率
+    ], lr=learning_rate)
+    
+    # 日志和模型保存路径设置
+    log_base_dir = 'F:/PythonProject/DistillationExercise/logs/distill'
+    student_base_dir = 'F:/PythonProject/DistillationExercise/save/student_model'
+    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_subdir = os.path.join(log_base_dir, f"{student_name}_dynamic_{current_time}")
+    student_subdir = os.path.join(student_base_dir, f"{student_name}_dynamic_{current_time}")
+    os.makedirs(log_subdir, exist_ok=True)
+    os.makedirs(student_subdir, exist_ok=True)
+    student_save_path = os.path.join(student_subdir, 'best_model.pth')
+    logger = tb_logger.Logger(logdir=log_subdir, flush_secs=2)
+    
+    best_acc = 0
+    patience = 5
+    epochs_no_improve = 0
+    
+    teacher.eval()  # 确保教师模型处于评估模式
+    
+    for epoch in range(epochs):
+        running_loss = 0.0
+        student.train()  # 确保学生模型处于训练模式
+        
+        for inputs, labels in train_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            
+            optimizer.zero_grad()
+            
+            # 教师模型前向传播（不计算梯度）
+            with torch.no_grad():
+                teacher_logits = teacher(inputs)
+            
+            # 学生模型前向传播
+            student_logits = student(inputs)
+            
+            # 计算软目标损失
+            soft_targets = nn.functional.softmax(teacher_logits / T, dim=-1)
+            soft_prob = nn.functional.log_softmax(student_logits / T, dim=-1)
+            soft_targets_loss = torch.sum(soft_targets * (soft_targets.log() - soft_prob)) / soft_prob.size()[0] * (T**2)
+            
+            # 计算真实标签损失
+            label_loss = ce_loss(student_logits, labels)
+            
+            # 使用Softmax确保权重和为1
+            weights = nn.functional.softmax(torch.stack([soft_target_weight, ce_weight]), dim=0)
+            norm_soft_target_weight, norm_ce_weight = weights[0], weights[1]
+            
+            # 加权组合损失
+            loss = norm_soft_target_weight * soft_targets_loss + norm_ce_weight * label_loss
+            
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+            
+        # 记录当前权重
+        logger.log_value('soft_target_weight', norm_soft_target_weight.item(), epoch+1)
+        logger.log_value('ce_weight', norm_ce_weight.item(), epoch+1)
+        
+        # 测试学生模型
+        student.eval()
+        test_acc = test(student, test_loader, device)
+        
+        if test_acc > best_acc:
+            best_acc = test_acc
+            # 保存最佳模型
+            torch.save({
+                'student_state_dict': student.state_dict(),
+                'soft_target_weight': soft_target_weight.item(),
+                'ce_weight': ce_weight.item(),
+                'epoch': epoch,
+                'accuracy': best_acc
+            }, student_save_path)
+            print("Best model saved")
+            logger.log_value('best_acc', best_acc, epoch+1)
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+        
+        if epochs_no_improve >= patience:
+            print(f"Early stopping at epoch {epoch+1}")
+            break
+        
+        logger.log_value('student_loss', running_loss / len(train_loader), epoch+1)
+        logger.log_value('student_acc', test_acc, epoch+1)
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}, "
+              f"Soft Weight: {norm_soft_target_weight.item():.4f}, CE Weight: {norm_ce_weight.item():.4f}")
+    
+    # 加载最佳模型
+    checkpoint = torch.load(student_save_path)
+    student.load_state_dict(checkpoint['student_state_dict'])
+    print(f"Final weights - Soft Target: {checkpoint['soft_target_weight']:.4f}, CE: {checkpoint['ce_weight']:.4f}")
+    
+    return best_acc
+
+# ... 其他现有代码 ...
 def adjust_alpha_cosine(epoch, init_soft_target_loss_weight = 0.9,  max_epoch=20):
     """
     余弦退火权重衰减策略
